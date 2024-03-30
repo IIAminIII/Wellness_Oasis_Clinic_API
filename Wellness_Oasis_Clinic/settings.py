@@ -30,6 +30,7 @@ SECRET_KEY = 'django-insecure-(yxlmfq--&$vwd^fazyvbmlnfz0657s7+ju7dyzh3%*9(2yuf-
 DEBUG = True
 
 ALLOWED_HOSTS = ["*"]
+CSRF_TRUSTED_ORIGINS = ['https://wellness-oasis-clinic-api.onrender.com','https://*.127.0.0.1']
 
 
 # Application definition

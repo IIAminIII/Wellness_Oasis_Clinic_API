@@ -31,7 +31,6 @@ class Doctor(models.Model):
     fee = models.IntegerField()
     meet_link = models.CharField(max_length = 100)
 
-
     def __str__(self):
         return f"Dr. {self.user.first_name} {self.user.last_name}"
 STAR_CHOICES =[

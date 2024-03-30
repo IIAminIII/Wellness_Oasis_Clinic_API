@@ -29,7 +29,7 @@ class RegistrationApiView(APIView):
             user = serializer.save()
             token = default_token_generator.make_token(user)
             uid = urlsafe_base64_encode(force_bytes(user.pk))
-            confirm_link = f"http://127.0.0.1:8000/patients/active/{uid}/{token}" 
+            confirm_link = f"https://wellness-oasis-clinic-api.onrender.com/patients/active/{uid}/{token}" 
             email_subject = "Confirm Your Email"
             email_body = render_to_string('patientEmail.html',{'confirm_link':confirm_link})
             email = EmailMultiAlternatives(email_subject,'',to=[user.email])

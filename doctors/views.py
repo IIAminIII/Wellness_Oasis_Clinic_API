@@ -42,6 +42,6 @@ class AvailableTimeViewSet(viewsets.ModelViewSet):
     serializer_class = AvailableTimeSerializer
     filter_backends = [AvailableTimeForSpecificDoctor]
 class  ReviewViewSet(viewsets.ModelViewSet):
-    permission_classes = [IsAuthenticated]
+    permission_classes = [IsAuthenticatedOrReadOnly]
     queryset = Review.objects.all()
     serializer_class = ReviewSerializer

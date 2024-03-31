@@ -8,16 +8,16 @@ from rest_framework import filters ,pagination
 
 
 
-class DoctorPagination(pagination.PageNumberPagination):
-    page_size = 1
-    page_size_query_param = 'page_size'
-    max_page_size = 100
+# class DoctorPagination(pagination.PageNumberPagination):
+#     page_size = 1
+#     page_size_query_param = 'page_size'
+#     max_page_size = 100
 
 class DoctorViewSet(viewsets.ModelViewSet):
     queryset = Doctor.objects.all()
     serializer_class = DoctorSerializer
     filter_backends = [filters.SearchFilter]
-    pagination_class = DoctorPagination
+    # pagination_class = DoctorPagination
     search_fields = ['user__first_name','user__email','designation__name','specialization__name']
 
 

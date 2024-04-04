@@ -29,7 +29,7 @@ class RegistrationApiView(APIView):
             user = serializer.save()
             token = default_token_generator.make_token(user)
             uid = urlsafe_base64_encode(force_bytes(user.pk))
-            confirm_link = f"https://wellness-oasis-clinic-api.onrender.com/patients/active/{uid}/{token}" 
+            confirm_link = f"https://wellness-oasis-clinic-api.onrender.com//patients/active/{uid}/{token}" 
             email_subject = "Confirm Your Email"
             email_body = render_to_string('patientEmail.html',{'confirm_link':confirm_link})
             email = EmailMultiAlternatives(email_subject,'',to=[user.email])
@@ -37,7 +37,7 @@ class RegistrationApiView(APIView):
             email.send()
             return Response("Check your mail for confirmation")
         return Response(serializer.errors)
-
+ 
 
 
 def activate(request,uid64,token):
@@ -57,7 +57,7 @@ def activate(request,uid64,token):
 class LoginApiView(APIView):
 
     def post(self,request):
-        serializer = LoginSerializer(data = request.data)
+        serializer = LoginSerializer(data = self.request.data)
 
         if serializer.is_valid():
             username = serializer.validated_data['username']
@@ -65,9 +65,11 @@ class LoginApiView(APIView):
 
             user = authenticate(username = username,password = password)
             if user:
-                token,_= Token.objects.get_or_create(user = user)
+                token,_= Token.objects.get_or_create(user=user)
+                print(token)
+                print(_)
                 login(request, user)
-                return Response({'token' : token, 'user_id':user.id})
+                return Response({'token' : token.key, 'user_id':user.id})
             else:
                 return Response({'error':"Invalid Credential"})
         return Response(serializer.errors)

@@ -2,6 +2,7 @@ from django.shortcuts import render
 from rest_framework import viewsets
 from .models import Appointment
 from .serializers import AppointmentSerializer
+from rest_framework.response import Response
 # Create your views here.
 
 
@@ -16,3 +17,10 @@ class AppointmentViewSet(viewsets.ModelViewSet):
         if patient_id:
             queryset = queryset.filter(patient_id = patient_id)
         return queryset
+
+
+    def post(self,request):
+        serializer = self.serializer_class(data = request.data)
+        if serializer.is_valid():
+            user = serializer.save()
+        return Response(serializer.errors)

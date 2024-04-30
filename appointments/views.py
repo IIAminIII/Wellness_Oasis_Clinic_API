@@ -22,5 +22,5 @@ class AppointmentViewSet(viewsets.ModelViewSet):
     def post(self,request):
         serializer = self.serializer_class(data = request.data)
         if serializer.is_valid():
-            user = serializer.save()
+            serializer.save()
         return Response(serializer.errors)

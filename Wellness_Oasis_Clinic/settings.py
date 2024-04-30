@@ -64,7 +64,8 @@ MIDDLEWARE = [
     'django.middleware.common.CommonMiddleware',
 ]
 CORS_ALLOWED_ORIGINS = [
-    "http://127.0.0.1:5500",  # Allow requests from your development origin
+    "http://127.0.0.1:5500", 
+    "https://wellness-oasis-clinic-front-end.vercel.app/", # Allow requests from your development origin
 ]
 
 

@@ -25,6 +25,29 @@ database, allowed hosts, mail provider, and HTTPS security values for deployment
 .\.venv\Scripts\python.exe manage.py test
 ```
 
+## Demo catalogue
+
+Populate non-patient demonstration services, doctors, and schedules:
+
+```powershell
+.\.venv\Scripts\python.exe manage.py seed_demo
+```
+
+The command is idempotent. It never creates patient accounts, appointments, or
+clinical records.
+
+## Render deployment
+
+Use `./build.sh` as the Render build command and:
+
+```text
+python -m gunicorn Wellness_Oasis_Clinic.wsgi:application
+```
+
+as the start command. Configure `DATABASE_URL` with Render Postgres; SQLite and
+uploaded media are intentionally excluded from Git. Patient uploads should use
+private managed object storage before the app handles real patient information.
+
 ## Important routes
 
 - `GET /health/`

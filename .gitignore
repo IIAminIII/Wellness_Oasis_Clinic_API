@@ -2,7 +2,9 @@
 .venv/
 __pycache__/
 *.py[cod]
-*.sqlite3.phase1-backup
+db.sqlite3*
+media/
+patients/images/
 staticfiles/
 .coverage
 .pytest_cache/

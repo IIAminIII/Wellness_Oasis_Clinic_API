@@ -1,47 +1,95 @@
-from django.shortcuts import render
-from rest_framework import viewsets
-from rest_framework.permissions import IsAuthenticated,IsAuthenticatedOrReadOnly
-from .models import Designation,Specialization,Doctor,AvailableTime,Review
-from .serializers import DoctorSerializer,SpecializationSerializer,DesignationSerializer,AvailableTimeSerializer,ReviewSerializer
-from rest_framework import filters ,pagination
-# Create your views here.
+from rest_framework import filters, viewsets
+from rest_framework.exceptions import PermissionDenied, ValidationError
+from rest_framework.permissions import IsAuthenticatedOrReadOnly
 
+from Wellness_Oasis_Clinic.permissions import IsAdminOrReadOnly
+from .models import AvailableTime, Designation, Doctor, Review, Specialization
+from .serializers import (
+    AvailableTimeSerializer,
+    DesignationSerializer,
+    DoctorSerializer,
+    ReviewSerializer,
+    SpecializationSerializer,
+)
 
-
-# class DoctorPagination(pagination.PageNumberPagination):
-#     page_size = 1
-#     page_size_query_param = 'page_size'
-#     max_page_size = 100
 
 class DoctorViewSet(viewsets.ModelViewSet):
-    queryset = Doctor.objects.all()
     serializer_class = DoctorSerializer
-    filter_backends = [filters.SearchFilter]
-    # pagination_class = DoctorPagination
-    search_fields = ['user__first_name','user__email','designation__name','specialization__name']
+    permission_classes = [IsAdminOrReadOnly]
+    filter_backends = [filters.SearchFilter, filters.OrderingFilter]
+    search_fields = [
+        "user__first_name",
+        "user__last_name",
+        "designation__name",
+        "specialization__name",
+    ]
+    ordering_fields = ["fee", "user__first_name"]
+    ordering = ["user__first_name"]
+
+    def get_queryset(self):
+        return (
+            Doctor.objects.select_related("user")
+            .prefetch_related("designation", "specialization", "available_time")
+            .distinct()
+        )
 
 
 class DesignationViewSet(viewsets.ModelViewSet):
-    queryset = Designation.objects.all()
+    queryset = Designation.objects.all().order_by("name")
     serializer_class = DesignationSerializer
+    permission_classes = [IsAdminOrReadOnly]
+
 
 class SpecializationViewSet(viewsets.ModelViewSet):
-    queryset = Specialization.objects.all()
+    queryset = Specialization.objects.all().order_by("name")
     serializer_class = SpecializationSerializer
+    permission_classes = [IsAdminOrReadOnly]
+
+
 class AvailableTimeForSpecificDoctor(filters.BaseFilterBackend):
-    def filter_queryset(self,request,query_set,view):
-        doctor_id  = request.query_params.get("doctor_id")
-        if doctor_id :
-            return query_set.filter(doctor = doctor_id)
-        return query_set
+    def filter_queryset(self, request, queryset, view):
+        doctor_id = request.query_params.get("doctor_id")
+        if doctor_id:
+            return queryset.filter(doctor__id=doctor_id).distinct()
+        return queryset
 
 
 class AvailableTimeViewSet(viewsets.ModelViewSet):
-    permission_classes = [IsAuthenticatedOrReadOnly]
-    queryset = AvailableTime.objects.all()
+    permission_classes = [IsAdminOrReadOnly]
+    queryset = AvailableTime.objects.all().order_by("name")
     serializer_class = AvailableTimeSerializer
     filter_backends = [AvailableTimeForSpecificDoctor]
-class  ReviewViewSet(viewsets.ModelViewSet):
+
+
+class ReviewViewSet(viewsets.ModelViewSet):
     permission_classes = [IsAuthenticatedOrReadOnly]
-    queryset = Review.objects.all()
     serializer_class = ReviewSerializer
+    http_method_names = ["get", "post", "patch", "delete", "head", "options"]
+
+    def get_queryset(self):
+        queryset = Review.objects.select_related("reviewer__user", "doctor__user")
+        doctor_id = self.request.query_params.get("doctor_id")
+        if doctor_id:
+            queryset = queryset.filter(doctor_id=doctor_id)
+        return queryset
+
+    def perform_create(self, serializer):
+        patient = getattr(self.request.user, "patient_profile", None)
+        if not patient:
+            raise ValidationError("A patient profile is required to add a review.")
+        serializer.save(reviewer=patient)
+
+    def _ensure_owner(self, instance):
+        if (
+            not self.request.user.is_staff
+            and instance.reviewer.user_id != self.request.user.id
+        ):
+            raise PermissionDenied("You can only change your own review.")
+
+    def perform_update(self, serializer):
+        self._ensure_owner(serializer.instance)
+        serializer.save()
+
+    def perform_destroy(self, instance):
+        self._ensure_owner(instance)
+        instance.delete()

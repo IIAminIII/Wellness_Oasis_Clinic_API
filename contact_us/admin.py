@@ -4,6 +4,8 @@ from .models import ContactUs
 
 
 class ContactModelAdmin(admin.ModelAdmin):
-    list_display = ['name','phone','Problem']
+    list_display = ["name", "phone", "email", "created_at", "resolved"]
+    list_filter = ["resolved", "created_at"]
+    search_fields = ["name", "phone", "email", "problem"]
 
 admin.site.register(ContactUs,ContactModelAdmin)

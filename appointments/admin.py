@@ -5,19 +5,40 @@ from django.core.mail import EmailMultiAlternatives
 # Register your models here.
 
 class AppointmentAdmin(admin.ModelAdmin):
-    list_display = ['doctor_name','patient_name','appointment_types','appointment_status','symptoms','time','cancel']
+    list_display = [
+        "doctor_name",
+        "patient_name",
+        "scheduled_date",
+        "time",
+        "appointment_type",
+        "appointment_status",
+        "cancel",
+    ]
+    list_filter = [
+        "appointment_status",
+        "appointment_type",
+        "scheduled_date",
+        "cancel",
+    ]
+    search_fields = [
+        "doctor__user__first_name",
+        "doctor__user__last_name",
+        "patient__user__first_name",
+        "patient__user__last_name",
+    ]
+    list_select_related = ["doctor__user", "patient__user", "time"]
 
     def doctor_name(self,obj):
         return obj.doctor.user.first_name
     def patient_name(self,obj):
         return obj.patient.user.first_name
     def save_model(self,request,obj,form,change):
-        obj.save()
-        if obj.appointment_status == "Running" and obj.appointment_types == "Online":
+        super().save_model(request, obj, form, change)
+        if obj.appointment_status == "Running" and obj.appointment_type == "Online":
             email_subject = "Your Appointment is Running"
             email_body = render_to_string('appointmentEmail.html',{'user':obj.patient.user,'doctor':obj.doctor})
             email = EmailMultiAlternatives(email_subject,'',to=[obj.patient.user.email])
             email.attach_alternative(email_body,"text/html")
-            email.send()    
+            email.send(fail_silently=True)
 
 admin.site.register(Appointment,AppointmentAdmin)

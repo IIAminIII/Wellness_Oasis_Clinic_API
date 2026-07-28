@@ -4,11 +4,12 @@ from . import views
 
 router = DefaultRouter()
 
-router.register('list', views.PatientViewSet)
+router.register('list', views.PatientViewSet, basename='patient')
 urlpatterns = [
     path('', include(router.urls)),
     path('register/',views.RegistrationApiView.as_view(),name = 'register'),
     path('login/',views.LoginApiView.as_view(),name = 'login'),
     path('logout/',views.LogOutView.as_view(),name = 'logout'),
+    path('me/', views.MeView.as_view(), name='me'),
     path('active/<uid64>/<token>/',views.activate,name = 'activate'),
 ]

@@ -1,1 +1,8 @@
-Wellness_Oasis_Clinic/.env
+.env
+.venv/
+__pycache__/
+*.py[cod]
+*.sqlite3.phase1-backup
+staticfiles/
+.coverage
+.pytest_cache/

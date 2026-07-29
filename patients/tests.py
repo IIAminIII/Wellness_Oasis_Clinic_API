@@ -3,6 +3,7 @@ from rest_framework import status
 from rest_framework.authtoken.models import Token
 from rest_framework.test import APITestCase
 
+from operations.models import RoleAssignment
 from .models import Patient
 
 
@@ -29,6 +30,14 @@ class AuthenticationFlowTests(APITestCase):
         self.assertIn("token", response.data)
         user = User.objects.get(username="amina")
         self.assertTrue(Patient.objects.filter(user=user).exists())
+        self.assertTrue(
+            RoleAssignment.objects.filter(
+                user=user,
+                role=RoleAssignment.Role.PATIENT,
+                is_active=True,
+            ).exists()
+        )
+        self.assertIn("patient", response.data["user"]["roles"])
 
     def test_login_profile_and_logout_flow(self):
         user = User.objects.create_user(
@@ -71,3 +80,27 @@ class AuthenticationFlowTests(APITestCase):
 
         self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
         self.assertIn("email", response.data["errors"])
+
+    def test_staff_login_does_not_create_patient_profile(self):
+        receptionist = User.objects.create_user(
+            username="reception",
+            email="reception@example.com",
+            password="Healing!Pass2026",
+        )
+        RoleAssignment.objects.create(
+            user=receptionist,
+            role=RoleAssignment.Role.RECEPTIONIST,
+        )
+
+        response = self.client.post(
+            "/patients/login/",
+            {
+                "identifier": "reception@example.com",
+                "password": "Healing!Pass2026",
+            },
+            format="json",
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertFalse(Patient.objects.filter(user=receptionist).exists())
+        self.assertIn("receptionist", response.data["user"]["roles"])

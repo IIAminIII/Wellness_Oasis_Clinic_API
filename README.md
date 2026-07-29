@@ -59,5 +59,12 @@ private managed object storage before the app handles real patient information.
 - `GET /doctors/list/{id}/`
 - `GET|POST /appointments/list/`
 - `POST /appointments/list/{id}/cancel/`
+- `POST /appointments/list/assisted/`
+- `POST /appointments/list/{id}/transition/`
+- `GET /operations/me/`
+- `GET /operations/dashboard/`
+- `GET|POST /operations/facilities/`
+- `GET|POST /operations/departments/`
+- `GET|POST /operations/roles/`
 
 Authenticated API requests use `Authorization: Token <token>`.

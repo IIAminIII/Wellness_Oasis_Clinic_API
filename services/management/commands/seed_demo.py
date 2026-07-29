@@ -3,6 +3,7 @@ from django.core.management.base import BaseCommand
 from django.utils.text import slugify
 
 from doctors.models import AvailableTime, Designation, Doctor, Specialization
+from operations.models import Department, Facility, RoleAssignment
 from services.models import Service
 
 
@@ -80,6 +81,15 @@ class Command(BaseCommand):
     help = "Create idempotent, non-patient demo catalogue data."
 
     def handle(self, *args, **options):
+        facility, _ = Facility.objects.get_or_create(
+            code="wellness-oasis-main",
+            defaults={
+                "name": "Wellness Oasis Main Hospital",
+                "address": "Dhaka, Bangladesh",
+                "phone": "+880 9600 000000",
+            },
+        )
+
         for name, description, image in SERVICES:
             service, _ = Service.objects.get_or_create(
                 name=name,
@@ -119,6 +129,11 @@ class Command(BaseCommand):
                 name=item["specialization"],
                 defaults={"slug": slugify(item["specialization"])},
             )
+            department, _ = Department.objects.get_or_create(
+                facility=facility,
+                code=slugify(item["specialization"]),
+                defaults={"name": item["specialization"]},
+            )
             doctor, _ = Doctor.objects.get_or_create(
                 user=user,
                 defaults={
@@ -133,5 +148,14 @@ class Command(BaseCommand):
             doctor.designation.add(designation)
             doctor.specialization.add(specialization)
             doctor.available_time.add(*time_slots)
+            RoleAssignment.objects.update_or_create(
+                user=user,
+                role=RoleAssignment.Role.DOCTOR,
+                facility=facility,
+                defaults={
+                    "department": department,
+                    "is_active": True,
+                },
+            )
 
         self.stdout.write(self.style.SUCCESS("Demo catalogue is ready."))

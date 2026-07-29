@@ -16,7 +16,13 @@ booking website. Each phase should ship as a tested, deployable increment.
 - Add patient portal, doctor discovery, booking, profile editing, and care desk.
 - Add backend regression tests and browser verification of the complete journey.
 
-## Phase 2 — hospital operations and access control
+## Phase 2 — hospital operations and access control (in progress)
+
+The first Phase 2 slice establishes explicit multi-role assignments, facilities,
+departments, role-aware dashboards, receptionist-assisted booking, guarded
+appointment transitions, and append-only audit events. Scheduling capacity,
+waitlists, stronger session authentication, and the remaining workforce modules
+continue as separate deployable slices.
 
 - Replace the implicit Django user roles with explicit Patient, Doctor, Nurse,
   Receptionist, Billing, Lab Technician, Pharmacist, and Administrator roles.

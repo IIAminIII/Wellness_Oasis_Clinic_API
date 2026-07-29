@@ -11,13 +11,21 @@ from django.utils.http import urlsafe_base64_decode, urlsafe_base64_encode
 from rest_framework import status, viewsets
 from rest_framework.authentication import TokenAuthentication
 from rest_framework.authtoken.models import Token
+from rest_framework.exceptions import PermissionDenied
 from rest_framework.permissions import AllowAny, IsAuthenticated
 from rest_framework.response import Response
 from rest_framework.throttling import ScopedRateThrottle
 from rest_framework.views import APIView
 
+from operations.models import RoleAssignment
+from operations.permissions import has_any_role
 from .models import Patient
-from .serializers import LoginSerializer, PatientSerializer, RegistrationSerializer
+from .serializers import (
+    LoginSerializer,
+    PatientSerializer,
+    RegistrationSerializer,
+    SessionUserSerializer,
+)
 
 
 class PatientViewSet(viewsets.ModelViewSet):
@@ -27,7 +35,10 @@ class PatientViewSet(viewsets.ModelViewSet):
 
     def get_queryset(self):
         queryset = Patient.objects.select_related("user")
-        if self.request.user.is_staff:
+        if has_any_role(
+            self.request.user,
+            RoleAssignment.Role.ADMINISTRATOR,
+        ):
             return queryset
         return queryset.filter(user=self.request.user)
 
@@ -80,7 +91,10 @@ class RegistrationApiView(APIView):
                 "success": True,
                 "message": "Your account is ready.",
                 "token": token.key,
-                "user": PatientSerializer(user.patient_profile).data,
+                "user": SessionUserSerializer(
+                    user,
+                    context={"request": request},
+                ).data,
             },
             status=status.HTTP_201_CREATED,
         )
@@ -138,14 +152,16 @@ class LoginApiView(APIView):
                 status=status.HTTP_403_FORBIDDEN,
             )
 
-        patient, _ = Patient.objects.get_or_create(user=user)
         Token.objects.filter(user=user).delete()
         token = Token.objects.create(user=user)
         return Response(
             {
                 "success": True,
                 "token": token.key,
-                "user": PatientSerializer(patient).data,
+                "user": SessionUserSerializer(
+                    user,
+                    context={"request": request},
+                ).data,
             }
         )
 
@@ -162,14 +178,21 @@ class LogOutView(APIView):
 class MeView(APIView):
     permission_classes = [IsAuthenticated]
 
+    @staticmethod
+    def _patient_for(user):
+        patient = getattr(user, "patient_profile", None)
+        if not patient:
+            raise PermissionDenied("A patient profile is required for this portal.")
+        return patient
+
     def get(self, request):
-        patient, _ = Patient.objects.get_or_create(user=request.user)
+        patient = self._patient_for(request.user)
         return Response(
             {"success": True, "user": PatientSerializer(patient).data}
         )
 
     def patch(self, request):
-        patient, _ = Patient.objects.get_or_create(user=request.user)
+        patient = self._patient_for(request.user)
         serializer = PatientSerializer(
             patient,
             data=request.data,

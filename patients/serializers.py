@@ -13,6 +13,7 @@ class PatientSerializer(serializers.ModelSerializer):
     last_name = serializers.CharField(source="user.last_name", required=False)
     email = serializers.EmailField(source="user.email", required=False)
     full_name = serializers.CharField(source="user.get_full_name", read_only=True)
+    roles = serializers.SerializerMethodField()
 
     class Meta:
         model = Patient
@@ -26,8 +27,17 @@ class PatientSerializer(serializers.ModelSerializer):
             "email",
             "mobile_no",
             "image",
+            "roles",
         ]
         read_only_fields = ["id", "user_id", "username", "full_name"]
+
+    def get_roles(self, patient):
+        return list(dict.fromkeys(
+            patient.user.role_assignments.filter(is_active=True).values_list(
+                "role",
+                flat=True,
+            )
+        ))
 
     def validate_email(self, value):
         queryset = User.objects.filter(email__iexact=value)
@@ -120,3 +130,44 @@ class LoginSerializer(serializers.Serializer):
             )
         attrs["identifier"] = identifier.strip()
         return attrs
+
+
+class SessionUserSerializer(serializers.ModelSerializer):
+    full_name = serializers.CharField(source="get_full_name", read_only=True)
+    mobile_no = serializers.SerializerMethodField()
+    image = serializers.SerializerMethodField()
+    roles = serializers.SerializerMethodField()
+
+    class Meta:
+        model = User
+        fields = [
+            "id",
+            "username",
+            "first_name",
+            "last_name",
+            "full_name",
+            "email",
+            "mobile_no",
+            "image",
+            "roles",
+        ]
+
+    def get_mobile_no(self, user):
+        patient = getattr(user, "patient_profile", None)
+        return patient.mobile_no if patient else ""
+
+    def get_image(self, user):
+        patient = getattr(user, "patient_profile", None)
+        if not patient or not patient.image:
+            return None
+        request = self.context.get("request")
+        url = patient.image.url
+        return request.build_absolute_uri(url) if request else url
+
+    def get_roles(self, user):
+        return list(dict.fromkeys(
+            user.role_assignments.filter(is_active=True).values_list(
+                "role",
+                flat=True,
+            )
+        ))

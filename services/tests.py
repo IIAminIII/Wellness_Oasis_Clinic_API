@@ -4,6 +4,7 @@ from rest_framework import status
 from rest_framework.test import APITestCase
 
 from doctors.models import Doctor
+from operations.models import RoleAssignment
 from .models import Service
 
 
@@ -21,9 +22,13 @@ class ServicePermissionTests(APITestCase):
         self.assertEqual(list_response.status_code, status.HTTP_200_OK)
         self.assertEqual(create_response.status_code, status.HTTP_401_UNAUTHORIZED)
 
-    def test_staff_can_create_services(self):
-        staff = User.objects.create_user(username="admin", is_staff=True)
-        self.client.force_authenticate(staff)
+    def test_administrator_can_create_services(self):
+        administrator = User.objects.create_user(username="admin")
+        RoleAssignment.objects.create(
+            user=administrator,
+            role=RoleAssignment.Role.ADMINISTRATOR,
+        )
+        self.client.force_authenticate(administrator)
 
         response = self.client.post(
             "/services/",

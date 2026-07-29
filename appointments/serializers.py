@@ -2,7 +2,9 @@ from django.utils import timezone
 from rest_framework import serializers
 
 from doctors.serializers import AvailableTimeSerializer, DoctorSerializer
+from operations.serializers import DepartmentSerializer, FacilitySerializer
 from patients.serializers import PatientSerializer
+from patients.models import Patient
 from .models import Appointment
 
 
@@ -10,6 +12,8 @@ class AppointmentSerializer(serializers.ModelSerializer):
     patient_detail = PatientSerializer(source="patient", read_only=True)
     doctor_detail = DoctorSerializer(source="doctor", read_only=True)
     time_detail = AvailableTimeSerializer(source="time", read_only=True)
+    facility_detail = FacilitySerializer(source="facility", read_only=True)
+    department_detail = DepartmentSerializer(source="department", read_only=True)
 
     class Meta:
         model = Appointment
@@ -25,7 +29,13 @@ class AppointmentSerializer(serializers.ModelSerializer):
             "scheduled_date",
             "time",
             "time_detail",
+            "facility",
+            "facility_detail",
+            "department",
+            "department_detail",
             "cancel",
+            "status_changed_by",
+            "status_changed_at",
             "created_at",
             "updated_at",
         ]
@@ -35,8 +45,14 @@ class AppointmentSerializer(serializers.ModelSerializer):
             "patient_detail",
             "doctor_detail",
             "time_detail",
+            "facility",
+            "facility_detail",
+            "department",
+            "department_detail",
             "appointment_status",
             "cancel",
+            "status_changed_by",
+            "status_changed_at",
             "created_at",
             "updated_at",
         ]
@@ -76,3 +92,20 @@ class AppointmentSerializer(serializers.ModelSerializer):
                 {"time": "That appointment slot has just been booked."}
             )
         return attrs
+
+
+class AssistedAppointmentSerializer(AppointmentSerializer):
+    patient = serializers.PrimaryKeyRelatedField(
+        queryset=Patient.objects.select_related("user"),
+    )
+
+    class Meta(AppointmentSerializer.Meta):
+        read_only_fields = [
+            field
+            for field in AppointmentSerializer.Meta.read_only_fields
+            if field != "patient"
+        ]
+
+
+class AppointmentTransitionSerializer(serializers.Serializer):
+    status = serializers.ChoiceField(choices=Appointment.Status.choices)

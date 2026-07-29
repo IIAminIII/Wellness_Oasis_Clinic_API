@@ -3,6 +3,8 @@ from rest_framework.exceptions import PermissionDenied, ValidationError
 from rest_framework.permissions import IsAuthenticatedOrReadOnly
 
 from Wellness_Oasis_Clinic.permissions import IsAdminOrReadOnly
+from operations.models import RoleAssignment
+from operations.permissions import has_any_role
 from .models import AvailableTime, Designation, Doctor, Review, Specialization
 from .serializers import (
     AvailableTimeSerializer,
@@ -81,7 +83,10 @@ class ReviewViewSet(viewsets.ModelViewSet):
 
     def _ensure_owner(self, instance):
         if (
-            not self.request.user.is_staff
+            not has_any_role(
+                self.request.user,
+                RoleAssignment.Role.ADMINISTRATOR,
+            )
             and instance.reviewer.user_id != self.request.user.id
         ):
             raise PermissionDenied("You can only change your own review.")

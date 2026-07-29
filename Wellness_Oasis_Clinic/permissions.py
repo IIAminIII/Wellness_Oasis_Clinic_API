@@ -1,12 +1,19 @@
 from rest_framework.permissions import BasePermission, SAFE_METHODS
 
+from operations.models import RoleAssignment
+from operations.permissions import has_any_role
+
 
 class IsAdminOrReadOnly(BasePermission):
-    """Public reads with writes restricted to Django staff."""
+    """Public reads with writes restricted to hospital administrators."""
 
     def has_permission(self, request, view):
         return request.method in SAFE_METHODS or (
-            request.user.is_authenticated and request.user.is_staff
+            request.user.is_authenticated
+            and has_any_role(
+                request.user,
+                RoleAssignment.Role.ADMINISTRATOR,
+            )
         )
 
 
@@ -16,4 +23,7 @@ class CreateOrAdminOnly(BasePermission):
     def has_permission(self, request, view):
         if request.method == "POST":
             return True
-        return request.user.is_authenticated and request.user.is_staff
+        return request.user.is_authenticated and has_any_role(
+            request.user,
+            RoleAssignment.Role.ADMINISTRATOR,
+        )

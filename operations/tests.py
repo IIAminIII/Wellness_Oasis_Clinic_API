@@ -73,6 +73,24 @@ class OperationsAccessTests(APITestCase):
         self.assertEqual(denied.status_code, status.HTTP_403_FORBIDDEN)
         self.assertEqual(allowed.status_code, status.HTTP_201_CREATED)
 
+    def test_administrator_cannot_remove_own_access(self):
+        administrator = User.objects.create_user(username="self-admin")
+        assignment = RoleAssignment.objects.create(
+            user=administrator,
+            role=RoleAssignment.Role.ADMINISTRATOR,
+        )
+        self.client.force_authenticate(administrator)
+
+        response = self.client.patch(
+            f"/operations/roles/{assignment.id}/",
+            {"is_active": False},
+            format="json",
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+        assignment.refresh_from_db()
+        self.assertTrue(assignment.is_active)
+
     def test_receptionist_dashboard_is_scoped_to_facility(self):
         receptionist = User.objects.create_user(username="desk")
         RoleAssignment.objects.create(

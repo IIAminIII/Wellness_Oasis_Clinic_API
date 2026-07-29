@@ -22,11 +22,13 @@ class FacilityViewSet(viewsets.ModelViewSet):
     queryset = Facility.objects.all()
     serializer_class = FacilitySerializer
     permission_classes = [IsAdministratorOrReadOnly]
+    http_method_names = ["get", "post", "patch", "head", "options"]
 
 
 class DepartmentViewSet(viewsets.ModelViewSet):
     serializer_class = DepartmentSerializer
     permission_classes = [IsAdministratorOrReadOnly]
+    http_method_names = ["get", "post", "patch", "head", "options"]
 
     def get_queryset(self):
         queryset = Department.objects.select_related("facility")
@@ -39,6 +41,7 @@ class DepartmentViewSet(viewsets.ModelViewSet):
 class RoleAssignmentViewSet(viewsets.ModelViewSet):
     serializer_class = RoleAssignmentSerializer
     permission_classes = [IsHospitalAdministrator]
+    http_method_names = ["get", "post", "patch", "head", "options"]
 
     def get_queryset(self):
         queryset = RoleAssignment.objects.select_related(

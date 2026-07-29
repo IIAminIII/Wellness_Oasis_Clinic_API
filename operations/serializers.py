@@ -68,6 +68,22 @@ class RoleAssignmentSerializer(serializers.ModelSerializer):
             raise serializers.ValidationError(
                 {"department": "Department must belong to the selected facility."}
             )
+        request = self.context.get("request")
+        if (
+            self.instance
+            and request
+            and self.instance.user_id == request.user.id
+            and self.instance.role == RoleAssignment.Role.ADMINISTRATOR
+        ):
+            next_role = attrs.get("role", self.instance.role)
+            next_active = attrs.get("is_active", self.instance.is_active)
+            if (
+                next_role != RoleAssignment.Role.ADMINISTRATOR
+                or not next_active
+            ):
+                raise serializers.ValidationError(
+                    "You cannot remove your own administrator access."
+                )
         return attrs
 
 

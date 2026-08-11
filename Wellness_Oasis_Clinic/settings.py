@@ -109,13 +109,23 @@ TEMPLATES = [
 WSGI_APPLICATION = "Wellness_Oasis_Clinic.wsgi.application"
 ASGI_APPLICATION = "Wellness_Oasis_Clinic.asgi.application"
 
+# Supabase (and any PgBouncer) in transaction-pooling mode hands a different
+# backend connection to each statement, so Django must not hold connections open
+# or use server-side cursors. Its transaction pooler listens on 6543; the session
+# pooler and a direct connection both use 5432 and behave like normal Postgres.
+DATABASE_URL = env("DATABASE_URL", default=f"sqlite:///{BASE_DIR / 'db.sqlite3'}")
+USING_TRANSACTION_POOLER = ":6543" in DATABASE_URL
+
 DATABASES = {
-    "default": dj_database_url.config(
-        default=f"sqlite:///{BASE_DIR / 'db.sqlite3'}",
-        conn_max_age=600,
-        conn_health_checks=True,
+    "default": dj_database_url.parse(
+        DATABASE_URL,
+        conn_max_age=0 if USING_TRANSACTION_POOLER else env.int("DB_CONN_MAX_AGE", default=600),
+        conn_health_checks=not USING_TRANSACTION_POOLER,
+        ssl_require=env.bool("DB_SSL_REQUIRE", default=False),
     )
 }
+if USING_TRANSACTION_POOLER:
+    DATABASES["default"]["DISABLE_SERVER_SIDE_CURSORS"] = True
 
 AUTH_PASSWORD_VALIDATORS = [
     {"NAME": "django.contrib.auth.password_validation.UserAttributeSimilarityValidator"},

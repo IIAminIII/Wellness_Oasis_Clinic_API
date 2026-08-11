@@ -44,9 +44,32 @@ Use `./build.sh` as the Render build command and:
 python -m gunicorn Wellness_Oasis_Clinic.wsgi:application
 ```
 
-as the start command. Configure `DATABASE_URL` with Render Postgres; SQLite and
-uploaded media are intentionally excluded from Git. Patient uploads should use
-private managed object storage before the app handles real patient information.
+as the start command. SQLite and uploaded media are intentionally excluded from
+Git. Patient uploads should use private managed object storage before the app
+handles real patient information.
+
+## Database
+
+Any Postgres reachable through `DATABASE_URL` works; nothing in the code is tied
+to a particular provider. Unset the variable to fall back to local SQLite.
+
+### Supabase
+
+Take the connection string from **Project settings → Database → Connection
+string → URI**, and use a **pooler** host rather than the direct
+`db.<ref>.supabase.co` one, which is IPv6-only and unreachable from most hosts:
+
+| Port | Mode | Use it when |
+| --- | --- | --- |
+| 5432 | Session pooler | Default. Behaves like ordinary Postgres. |
+| 6543 | Transaction pooler | Many short-lived connections. |
+
+Set `DB_SSL_REQUIRE=True` alongside it. Port 6543 is detected automatically, and
+persistent connections plus server-side cursors are switched off for it, because
+a transaction pooler can serve consecutive statements from different backends.
+
+Migrations run from `build.sh`, so a brand-new database only needs the variable
+set; the first deploy creates the schema and seeds the demo catalogue.
 
 ## Important routes
 

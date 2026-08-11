@@ -1,11 +1,12 @@
-from datetime import timedelta
+from datetime import time
 
 from django.contrib.auth.models import User
 from django.utils import timezone
 from rest_framework import status
 from rest_framework.test import APITestCase
 
-from doctors.models import AvailableTime, Doctor
+from doctors.models import Doctor
+from doctors.testing import make_slot, next_date_for
 from operations.models import (
     AuditEvent,
     Department,
@@ -25,8 +26,13 @@ class AppointmentApiTests(APITestCase):
         self.patient = Patient.objects.create(user=self.user)
         doctor_user = User.objects.create_user(username="doctor")
         self.doctor = Doctor.objects.create(user=doctor_user, fee=1200)
-        self.slot = AvailableTime.objects.create(name="09:00 - 09:30")
-        self.other_slot = AvailableTime.objects.create(name="10:00 - 10:30")
+        self.slot = make_slot(weekday=0)
+        self.other_slot = make_slot(
+            weekday=0,
+            start=time(10, 0),
+            end=time(10, 30),
+        )
+        self.slot_date = next_date_for(self.slot)
         self.doctor.available_time.add(self.slot)
         self.client.force_authenticate(self.user)
 
@@ -37,7 +43,7 @@ class AppointmentApiTests(APITestCase):
                 "doctor": self.doctor.id,
                 "appointment_type": "Offline",
                 "symptoms": "Persistent headache",
-                "scheduled_date": str(timezone.localdate() + timedelta(days=1)),
+                "scheduled_date": str(self.slot_date),
                 "time": self.slot.id,
             },
             format="json",
@@ -55,7 +61,7 @@ class AppointmentApiTests(APITestCase):
                 "doctor": self.doctor.id,
                 "appointment_type": "Online",
                 "symptoms": "Follow-up",
-                "scheduled_date": str(timezone.localdate() + timedelta(days=1)),
+                "scheduled_date": str(self.slot_date),
                 "time": self.other_slot.id,
             },
             format="json",
@@ -70,7 +76,7 @@ class AppointmentApiTests(APITestCase):
             doctor=self.doctor,
             appointment_type="Offline",
             symptoms="Follow-up",
-            scheduled_date=timezone.localdate() + timedelta(days=1),
+            scheduled_date=self.slot_date,
             time=self.slot,
         )
 
@@ -105,14 +111,15 @@ class AppointmentOperationsTests(APITestCase):
             facility=self.facility,
             department=self.department,
         )
-        self.slot = AvailableTime.objects.create(name="11:00 - 11:30")
+        self.slot = make_slot(weekday=2, start=time(11, 0), end=time(11, 30))
+        self.slot_date = next_date_for(self.slot)
         self.doctor.available_time.add(self.slot)
         self.appointment = Appointment.objects.create(
             patient=self.patient,
             doctor=self.doctor,
             appointment_type=Appointment.Type.OFFLINE,
             symptoms="Chest discomfort",
-            scheduled_date=timezone.localdate() + timedelta(days=1),
+            scheduled_date=self.slot_date,
             time=self.slot,
             facility=self.facility,
             department=self.department,
@@ -165,7 +172,7 @@ class AppointmentOperationsTests(APITestCase):
             role=RoleAssignment.Role.RECEPTIONIST,
             facility=self.facility,
         )
-        second_slot = AvailableTime.objects.create(name="13:00 - 13:30")
+        second_slot = make_slot(weekday=4, start=time(13, 0), end=time(13, 30))
         self.doctor.available_time.add(second_slot)
         self.client.force_authenticate(receptionist)
 
@@ -176,9 +183,7 @@ class AppointmentOperationsTests(APITestCase):
                 "doctor": self.doctor.id,
                 "appointment_type": Appointment.Type.OFFLINE,
                 "symptoms": "Reception desk booking",
-                "scheduled_date": str(
-                    timezone.localdate() + timedelta(days=2)
-                ),
+                "scheduled_date": str(next_date_for(second_slot)),
                 "time": second_slot.id,
             },
             format="json",

@@ -18,21 +18,40 @@ booking website. Each phase should ship as a tested, deployable increment.
 
 ## Phase 2 — hospital operations and access control (in progress)
 
-The first Phase 2 slice establishes explicit multi-role assignments, facilities,
-departments, role-aware dashboards, receptionist-assisted booking, guarded
-appointment transitions, and append-only audit events. Scheduling capacity,
-waitlists, stronger session authentication, and the remaining workforce modules
-continue as separate deployable slices.
+### Slice 1 — roles, facilities, and guarded workflows (completed)
 
-- Replace the implicit Django user roles with explicit Patient, Doctor, Nurse,
+- Replaced the implicit Django user roles with explicit Patient, Doctor, Nurse,
   Receptionist, Billing, Lab Technician, Pharmacist, and Administrator roles.
-- Add facilities, departments, rooms, beds, shifts, doctor leave, recurring
-  schedules, slot capacity, waitlists, and receptionist-assisted bookings.
+- Added facilities, departments, role-aware dashboards, receptionist-assisted
+  booking, guarded appointment transitions, and append-only audit events.
+
+### Slice 2 — scheduling capacity and ward inventory (completed)
+
+- Turned free-text slot labels into structured weekly templates carrying a
+  weekday, start and end time, per-slot capacity, and an active flag. A data
+  migration parses the legacy labels and merges any duplicates.
+- Booking now rejects wrong-weekday dates, inactive slots, doctors on approved
+  leave, and any booking past a slot's capacity, all from one shared rule set
+  (`appointments/scheduling.py`) used by the API and the availability calendar.
+- Added doctor leave with a request/approve workflow and an audited decision.
+- Added a public per-doctor availability endpoint reporting remaining places
+  per slot over a date window, and wired the booking form to it.
+- Added a waitlist: patients join a full slot, a cancellation offers the place
+  to the longest waiter, and accepting re-checks capacity before booking.
+- Added rooms and beds as facility inventory with nurse-writable bed status.
+
+### Slice 3 — authentication hardening (next)
+
 - Introduce short-lived authentication, refresh rotation, device/session
   management, password reset, optional MFA, and account recovery.
-- Add audit events for viewing or changing sensitive records.
-- Build role-specific dashboards and an operations-focused component library.
+  API tokens are currently long-lived and never expire.
+
+### Slice 4 — shifts, schema documentation, and CI
+
+- Add staff shifts and rostering on top of the facility/department model.
 - Add API schema documentation, CI checks, and end-to-end role tests.
+- Extend audit events to cover viewing or changing every sensitive record.
+- Grow the operations-focused component library behind the role dashboards.
 
 ## Phase 3 — clinical records
 

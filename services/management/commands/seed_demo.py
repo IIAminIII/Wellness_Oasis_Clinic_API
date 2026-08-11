@@ -1,9 +1,11 @@
+from datetime import time
+
 from django.contrib.auth.models import User
 from django.core.management.base import BaseCommand
 from django.utils.text import slugify
 
 from doctors.models import AvailableTime, Designation, Doctor, Specialization
-from operations.models import Department, Facility, RoleAssignment
+from operations.models import Bed, Department, Facility, RoleAssignment, Room
 from services.models import Service
 
 
@@ -70,10 +72,18 @@ DOCTORS = [
     },
 ]
 
+# (weekday, start, end, capacity) — weekday matches date.weekday().
 TIMES = [
-    "Saturday 09:00 - 12:00",
-    "Sunday 14:00 - 17:00",
-    "Tuesday 09:00 - 12:00",
+    (5, time(9, 0), time(12, 0), 4),
+    (6, time(14, 0), time(17, 0), 4),
+    (1, time(9, 0), time(12, 0), 3),
+]
+
+ROOMS = [
+    ("101", "Consultation A", "consultation", 0),
+    ("102", "Consultation B", "consultation", 0),
+    ("201", "General ward", "ward", 6),
+    ("301", "Intensive care", "icu", 3),
 ]
 
 
@@ -106,7 +116,13 @@ class Command(BaseCommand):
                 service.save()
 
         time_slots = [
-            AvailableTime.objects.get_or_create(name=name)[0] for name in TIMES
+            AvailableTime.objects.get_or_create(
+                weekday=weekday,
+                start_time=start,
+                end_time=end,
+                defaults={"capacity": capacity},
+            )[0]
+            for weekday, start, end, capacity in TIMES
         ]
 
         for item in DOCTORS:
@@ -157,5 +173,14 @@ class Command(BaseCommand):
                     "is_active": True,
                 },
             )
+
+        for number, name, kind, bed_count in ROOMS:
+            room, _ = Room.objects.get_or_create(
+                facility=facility,
+                number=number,
+                defaults={"name": name, "kind": kind},
+            )
+            for index in range(bed_count):
+                Bed.objects.get_or_create(room=room, label=f"{number}-{index + 1}")
 
         self.stdout.write(self.style.SUCCESS("Demo catalogue is ready."))

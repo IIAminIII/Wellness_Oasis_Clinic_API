@@ -1,7 +1,7 @@
 from django.contrib.auth import get_user_model
 from rest_framework import serializers
 
-from .models import Department, Facility, RoleAssignment
+from .models import Bed, Department, Facility, RoleAssignment, Room
 
 
 class FacilitySerializer(serializers.ModelSerializer):
@@ -32,6 +32,55 @@ class DepartmentSerializer(serializers.ModelSerializer):
             "description",
             "is_active",
         ]
+
+
+class BedSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = Bed
+        fields = ["id", "room", "label", "status", "notes"]
+
+
+class RoomSerializer(serializers.ModelSerializer):
+    facility_name = serializers.CharField(source="facility.name", read_only=True)
+    department_name = serializers.CharField(source="department.name", read_only=True)
+    kind_label = serializers.CharField(source="get_kind_display", read_only=True)
+    beds = BedSerializer(many=True, read_only=True)
+    available_beds = serializers.SerializerMethodField()
+
+    class Meta:
+        model = Room
+        fields = [
+            "id",
+            "facility",
+            "facility_name",
+            "department",
+            "department_name",
+            "number",
+            "name",
+            "kind",
+            "kind_label",
+            "floor",
+            "is_active",
+            "beds",
+            "available_beds",
+        ]
+
+    def get_available_beds(self, room):
+        return sum(
+            1 for bed in room.beds.all() if bed.status == Bed.Status.AVAILABLE
+        )
+
+    def validate(self, attrs):
+        facility = attrs.get("facility", getattr(self.instance, "facility", None))
+        department = attrs.get(
+            "department",
+            getattr(self.instance, "department", None),
+        )
+        if department and department.facility_id != getattr(facility, "id", None):
+            raise serializers.ValidationError(
+                {"department": "Department must belong to the selected facility."}
+            )
+        return attrs
 
 
 class RoleAssignmentSerializer(serializers.ModelSerializer):

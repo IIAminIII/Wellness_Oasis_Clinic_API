@@ -1,6 +1,13 @@
 from rest_framework import serializers
 
-from .models import AvailableTime, Designation, Doctor, Review, Specialization
+from .models import (
+    AvailableTime,
+    Designation,
+    Doctor,
+    DoctorLeave,
+    Review,
+    Specialization,
+)
 
 
 class DesignationSerializer(serializers.ModelSerializer):
@@ -16,9 +23,33 @@ class SpecializationSerializer(serializers.ModelSerializer):
 
 
 class AvailableTimeSerializer(serializers.ModelSerializer):
+    weekday_label = serializers.CharField(
+        source="get_weekday_display",
+        read_only=True,
+    )
+
     class Meta:
         model = AvailableTime
-        fields = ["id", "name"]
+        fields = [
+            "id",
+            "name",
+            "weekday",
+            "weekday_label",
+            "start_time",
+            "end_time",
+            "capacity",
+            "is_active",
+        ]
+        read_only_fields = ["id", "name", "weekday_label"]
+
+    def validate(self, attrs):
+        start = attrs.get("start_time", getattr(self.instance, "start_time", None))
+        end = attrs.get("end_time", getattr(self.instance, "end_time", None))
+        if start and end and end <= start:
+            raise serializers.ValidationError(
+                {"end_time": "The slot must end after it starts."}
+            )
+        return attrs
 
 
 class DoctorSerializer(serializers.ModelSerializer):
@@ -40,6 +71,49 @@ class DoctorSerializer(serializers.ModelSerializer):
             "bio",
             "is_accepting_patients",
         ]
+
+
+class DoctorLeaveSerializer(serializers.ModelSerializer):
+    doctor_name = serializers.CharField(source="doctor.__str__", read_only=True)
+
+    class Meta:
+        model = DoctorLeave
+        fields = [
+            "id",
+            "doctor",
+            "doctor_name",
+            "start_date",
+            "end_date",
+            "reason",
+            "status",
+            "reviewed_by",
+            "created_at",
+        ]
+        read_only_fields = [
+            "id",
+            "doctor_name",
+            "status",
+            "reviewed_by",
+            "created_at",
+        ]
+
+    def validate(self, attrs):
+        start = attrs.get("start_date", getattr(self.instance, "start_date", None))
+        end = attrs.get("end_date", getattr(self.instance, "end_date", None))
+        if start and end and end < start:
+            raise serializers.ValidationError(
+                {"end_date": "Leave must end on or after it starts."}
+            )
+        return attrs
+
+
+class DoctorLeaveDecisionSerializer(serializers.Serializer):
+    status = serializers.ChoiceField(
+        choices=[
+            DoctorLeave.Status.APPROVED,
+            DoctorLeave.Status.DECLINED,
+        ]
+    )
 
 
 class ReviewSerializer(serializers.ModelSerializer):

@@ -5,7 +5,8 @@ from doctors.serializers import AvailableTimeSerializer, DoctorSerializer
 from operations.serializers import DepartmentSerializer, FacilitySerializer
 from patients.serializers import PatientSerializer
 from patients.models import Patient
-from .models import Appointment
+from .models import Appointment, WaitlistEntry
+from .scheduling import slot_unavailable_reason
 
 
 class AppointmentSerializer(serializers.ModelSerializer):
@@ -70,27 +71,16 @@ class AppointmentSerializer(serializers.ModelSerializer):
             getattr(self.instance, "scheduled_date", None),
         )
 
-        if doctor and not doctor.is_accepting_patients:
-            raise serializers.ValidationError(
-                {"doctor": "This doctor is not accepting appointments."}
+        if doctor and time and scheduled_date:
+            reason = slot_unavailable_reason(
+                doctor=doctor,
+                slot=time,
+                scheduled_date=scheduled_date,
+                exclude_pk=self.instance.pk if self.instance else None,
             )
-        if doctor and time and not doctor.available_time.filter(pk=time.pk).exists():
-            raise serializers.ValidationError(
-                {"time": "This time is not available for the selected doctor."}
-            )
-
-        collision = Appointment.objects.filter(
-            doctor=doctor,
-            time=time,
-            scheduled_date=scheduled_date,
-            cancel=False,
-        )
-        if self.instance:
-            collision = collision.exclude(pk=self.instance.pk)
-        if doctor and time and scheduled_date and collision.exists():
-            raise serializers.ValidationError(
-                {"time": "That appointment slot has just been booked."}
-            )
+            if reason:
+                field = "doctor" if doctor and not doctor.is_accepting_patients else "time"
+                raise serializers.ValidationError({field: reason})
         return attrs
 
 
@@ -109,3 +99,69 @@ class AssistedAppointmentSerializer(AppointmentSerializer):
 
 class AppointmentTransitionSerializer(serializers.Serializer):
     status = serializers.ChoiceField(choices=Appointment.Status.choices)
+
+
+class WaitlistEntrySerializer(serializers.ModelSerializer):
+    patient_detail = PatientSerializer(source="patient", read_only=True)
+    doctor_detail = DoctorSerializer(source="doctor", read_only=True)
+    time_detail = AvailableTimeSerializer(source="time", read_only=True)
+
+    class Meta:
+        model = WaitlistEntry
+        fields = [
+            "id",
+            "patient",
+            "patient_detail",
+            "doctor",
+            "doctor_detail",
+            "time",
+            "time_detail",
+            "requested_date",
+            "symptoms",
+            "status",
+            "appointment",
+            "offered_at",
+            "created_at",
+        ]
+        read_only_fields = [
+            "id",
+            "patient",
+            "patient_detail",
+            "doctor_detail",
+            "time_detail",
+            "status",
+            "appointment",
+            "offered_at",
+            "created_at",
+        ]
+
+    def validate_requested_date(self, value):
+        if value < timezone.localdate():
+            raise serializers.ValidationError("Choose today or a future date.")
+        return value
+
+    def validate(self, attrs):
+        doctor = attrs.get("doctor")
+        slot = attrs.get("time")
+        requested_date = attrs.get("requested_date")
+        if not (doctor and slot and requested_date):
+            return attrs
+
+        if slot.weekday != requested_date.weekday():
+            raise serializers.ValidationError(
+                {"time": "That slot does not run on the requested weekday."}
+            )
+        if not doctor.available_time.filter(pk=slot.pk).exists():
+            raise serializers.ValidationError(
+                {"time": "This time is not available for the selected doctor."}
+            )
+        # Joining a waitlist only makes sense once the slot is actually full.
+        if not slot_unavailable_reason(
+            doctor=doctor,
+            slot=slot,
+            scheduled_date=requested_date,
+        ):
+            raise serializers.ValidationError(
+                {"time": "This slot is still open — book it directly instead."}
+            )
+        return attrs

@@ -8,13 +8,19 @@ from rest_framework.views import APIView
 from appointments.models import Appointment
 from appointments.serializers import AppointmentSerializer
 
-from .models import Department, Facility, RoleAssignment
-from .permissions import IsAdministratorOrReadOnly, IsHospitalAdministrator
+from .models import AuditEvent, Bed, Department, Facility, RoleAssignment, Room
+from .permissions import (
+    IsAdministratorOrReadOnly,
+    IsHospitalAdministrator,
+    IsWardStaffOrReadOnly,
+)
 from .serializers import (
+    BedSerializer,
     CurrentActorSerializer,
     DepartmentSerializer,
     FacilitySerializer,
     RoleAssignmentSerializer,
+    RoomSerializer,
 )
 
 
@@ -36,6 +42,53 @@ class DepartmentViewSet(viewsets.ModelViewSet):
         if facility_id:
             queryset = queryset.filter(facility_id=facility_id)
         return queryset
+
+
+class RoomViewSet(viewsets.ModelViewSet):
+    serializer_class = RoomSerializer
+    permission_classes = [IsAdministratorOrReadOnly]
+    http_method_names = ["get", "post", "patch", "head", "options"]
+
+    def get_queryset(self):
+        queryset = Room.objects.select_related(
+            "facility",
+            "department",
+        ).prefetch_related("beds")
+        facility_id = self.request.query_params.get("facility")
+        kind = self.request.query_params.get("kind")
+        if facility_id:
+            queryset = queryset.filter(facility_id=facility_id)
+        if kind:
+            queryset = queryset.filter(kind=kind)
+        return queryset
+
+
+class BedViewSet(viewsets.ModelViewSet):
+    serializer_class = BedSerializer
+    permission_classes = [IsWardStaffOrReadOnly]
+    http_method_names = ["get", "post", "patch", "head", "options"]
+
+    def get_queryset(self):
+        queryset = Bed.objects.select_related("room__facility")
+        room_id = self.request.query_params.get("room")
+        bed_status = self.request.query_params.get("status")
+        if room_id:
+            queryset = queryset.filter(room_id=room_id)
+        if bed_status:
+            queryset = queryset.filter(status=bed_status)
+        return queryset
+
+    def perform_update(self, serializer):
+        previous = serializer.instance.status
+        bed = serializer.save()
+        if bed.status != previous:
+            AuditEvent.record(
+                request=self.request,
+                action="bed.status_changed",
+                target=bed,
+                facility=bed.room.facility,
+                metadata={"from": previous, "to": bed.status},
+            )
 
 
 class RoleAssignmentViewSet(viewsets.ModelViewSet):

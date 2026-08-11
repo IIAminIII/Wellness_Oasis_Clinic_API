@@ -1,5 +1,5 @@
 from django.contrib import admin
-from .models import Appointment
+from .models import Appointment, WaitlistEntry
 from django.template.loader import render_to_string
 from django.core.mail import EmailMultiAlternatives
 # Register your models here.
@@ -42,3 +42,16 @@ class AppointmentAdmin(admin.ModelAdmin):
             email.send(fail_silently=True)
 
 admin.site.register(Appointment,AppointmentAdmin)
+
+
+class WaitlistEntryAdmin(admin.ModelAdmin):
+    list_display = ["patient", "doctor", "requested_date", "time", "status"]
+    list_filter = ["status", "requested_date"]
+    search_fields = [
+        "patient__user__first_name",
+        "patient__user__last_name",
+        "doctor__user__last_name",
+    ]
+    list_select_related = ["patient__user", "doctor__user", "time"]
+
+admin.site.register(WaitlistEntry, WaitlistEntryAdmin)

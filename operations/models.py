@@ -48,6 +48,95 @@ class Department(models.Model):
         return f"{self.facility}: {self.name}"
 
 
+class Room(models.Model):
+    class Kind(models.TextChoices):
+        CONSULTATION = "consultation", "Consultation"
+        PROCEDURE = "procedure", "Procedure"
+        WARD = "ward", "Ward"
+        ICU = "icu", "Intensive care"
+        LABORATORY = "laboratory", "Laboratory"
+
+    facility = models.ForeignKey(
+        Facility,
+        on_delete=models.PROTECT,
+        related_name="rooms",
+    )
+    department = models.ForeignKey(
+        Department,
+        on_delete=models.PROTECT,
+        related_name="rooms",
+        blank=True,
+        null=True,
+    )
+    number = models.CharField(max_length=20)
+    name = models.CharField(max_length=120, blank=True)
+    kind = models.CharField(
+        max_length=20,
+        choices=Kind.choices,
+        default=Kind.CONSULTATION,
+    )
+    floor = models.CharField(max_length=20, blank=True)
+    is_active = models.BooleanField(default=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ["facility__name", "number"]
+        constraints = [
+            models.UniqueConstraint(
+                fields=["facility", "number"],
+                name="unique_room_number_per_facility",
+            ),
+        ]
+
+    def clean(self):
+        if self.department and self.facility_id != self.department.facility_id:
+            raise ValidationError(
+                {"department": "Department must belong to the selected facility."}
+            )
+
+    def __str__(self):
+        return f"{self.facility}: room {self.number}"
+
+
+class Bed(models.Model):
+    class Status(models.TextChoices):
+        AVAILABLE = "available", "Available"
+        OCCUPIED = "occupied", "Occupied"
+        CLEANING = "cleaning", "Cleaning"
+        OUT_OF_SERVICE = "out_of_service", "Out of service"
+
+    room = models.ForeignKey(
+        Room,
+        on_delete=models.CASCADE,
+        related_name="beds",
+    )
+    label = models.CharField(max_length=20)
+    status = models.CharField(
+        max_length=20,
+        choices=Status.choices,
+        default=Status.AVAILABLE,
+    )
+    notes = models.CharField(max_length=200, blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ["room__number", "label"]
+        constraints = [
+            models.UniqueConstraint(
+                fields=["room", "label"],
+                name="unique_bed_label_per_room",
+            ),
+        ]
+        indexes = [
+            models.Index(fields=["status"], name="bed_status_idx"),
+        ]
+
+    def __str__(self):
+        return f"{self.room} bed {self.label}"
+
+
 class RoleAssignment(models.Model):
     class Role(models.TextChoices):
         PATIENT = "patient", "Patient"

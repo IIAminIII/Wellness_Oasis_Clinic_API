@@ -1,4 +1,4 @@
-from datetime import timedelta
+from datetime import time
 
 from django.contrib.auth.models import User
 from django.utils import timezone
@@ -6,7 +6,8 @@ from rest_framework import status
 from rest_framework.test import APITestCase
 
 from appointments.models import Appointment
-from doctors.models import AvailableTime, Doctor
+from doctors.models import Doctor
+from doctors.testing import make_slot, next_date_for
 from patients.models import Patient
 
 from .models import Department, Facility, RoleAssignment
@@ -102,14 +103,14 @@ class OperationsAccessTests(APITestCase):
         patient = Patient.objects.create(user=patient_user)
         doctor_user = User.objects.create_user(username="dashboard-doctor")
         doctor = Doctor.objects.create(user=doctor_user, fee=1000)
-        slot = AvailableTime.objects.create(name="15:00 - 15:30")
+        slot = make_slot(weekday=3, start=time(15, 0), end=time(15, 30))
         doctor.available_time.add(slot)
         Appointment.objects.create(
             patient=patient,
             doctor=doctor,
             appointment_type=Appointment.Type.OFFLINE,
             symptoms="Routine check",
-            scheduled_date=timezone.localdate() + timedelta(days=1),
+            scheduled_date=next_date_for(slot),
             time=slot,
             facility=self.facility,
             department=self.department,

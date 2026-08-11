@@ -9,6 +9,12 @@ router.register('specialization', views.SpecializationViewSet)
 router.register('designation', views.DesignationViewSet)
 router.register('reviews', views.ReviewViewSet, basename='review')
 router.register('availableTime', views.AvailableTimeViewSet)
+router.register('leave', views.DoctorLeaveViewSet, basename='doctor-leave')
 urlpatterns = [
     path('', include(router.urls)),
+    path(
+        'list/<int:doctor_id>/availability/',
+        views.DoctorAvailabilityView.as_view(),
+        name='doctor-availability',
+    ),
 ]

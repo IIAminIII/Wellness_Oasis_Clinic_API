@@ -1,6 +1,26 @@
 from django.contrib import admin
 
-from .models import AuditEvent, Department, Facility, RoleAssignment
+from .models import AuditEvent, Bed, Department, Facility, RoleAssignment, Room
+
+
+class BedInline(admin.TabularInline):
+    model = Bed
+    extra = 0
+
+
+@admin.register(Room)
+class RoomAdmin(admin.ModelAdmin):
+    list_display = ["number", "name", "facility", "department", "kind", "is_active"]
+    list_filter = ["facility", "kind", "is_active"]
+    search_fields = ["number", "name"]
+    inlines = [BedInline]
+
+
+@admin.register(Bed)
+class BedAdmin(admin.ModelAdmin):
+    list_display = ["label", "room", "status"]
+    list_filter = ["status", "room__facility"]
+    search_fields = ["label", "room__number"]
 
 
 @admin.register(Facility)

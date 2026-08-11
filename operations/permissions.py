@@ -32,6 +32,20 @@ class IsHospitalAdministrator(BasePermission):
         )
 
 
+class IsWardStaffOrReadOnly(BasePermission):
+    """Bed state is changed at the bedside, so nurses need write access too."""
+
+    def has_permission(self, request, view):
+        if request.method in SAFE_METHODS:
+            return request.user.is_authenticated
+        return request.user.is_authenticated and has_any_role(
+            request.user,
+            RoleAssignment.Role.NURSE,
+            RoleAssignment.Role.RECEPTIONIST,
+            RoleAssignment.Role.ADMINISTRATOR,
+        )
+
+
 class IsAdministratorOrReadOnly(BasePermission):
     def has_permission(self, request, view):
         if request.method in SAFE_METHODS:

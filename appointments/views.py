@@ -10,11 +10,13 @@ from rest_framework.response import Response
 
 from operations.models import AuditEvent, RoleAssignment
 from operations.permissions import active_roles, has_any_role
-from .models import Appointment
+from .models import Appointment, WaitlistEntry
+from .scheduling import offer_freed_slot, slot_unavailable_reason
 from .serializers import (
     AppointmentSerializer,
     AppointmentTransitionSerializer,
     AssistedAppointmentSerializer,
+    WaitlistEntrySerializer,
 )
 
 
@@ -237,6 +239,8 @@ class AppointmentViewSet(viewsets.ModelViewSet):
             facility=appointment.facility,
             metadata={"from": previous_status, "to": next_status},
         )
+        if next_status == Appointment.Status.CANCELLED:
+            offer_freed_slot(appointment)
         return Response(
             {
                 "success": True,
@@ -244,6 +248,23 @@ class AppointmentViewSet(viewsets.ModelViewSet):
                     appointment,
                     context={"request": request},
                 ).data,
+            }
+        )
+
+    @action(detail=False, methods=["get"])
+    def waitlist_offers(self, request):
+        """Offers currently held by the signed-in patient."""
+        patient = getattr(request.user, "patient_profile", None)
+        entries = WaitlistEntry.objects.none()
+        if patient:
+            entries = WaitlistEntry.objects.filter(
+                patient=patient,
+                status=WaitlistEntry.Status.OFFERED,
+            ).select_related("doctor__user", "time", "patient__user")
+        return Response(
+            {
+                "success": True,
+                "offers": WaitlistEntrySerializer(entries, many=True).data,
             }
         )
 
@@ -279,7 +300,125 @@ class AppointmentViewSet(viewsets.ModelViewSet):
             target=appointment,
             facility=appointment.facility,
         )
+        offer_freed_slot(appointment)
         return Response(
             {"success": True, "appointment": self.get_serializer(appointment).data},
             status=status.HTTP_200_OK,
         )
+
+
+class WaitlistEntryViewSet(viewsets.ModelViewSet):
+    serializer_class = WaitlistEntrySerializer
+    permission_classes = [IsAuthenticated]
+    http_method_names = ["get", "post", "head", "options"]
+
+    def get_queryset(self):
+        queryset = WaitlistEntry.objects.select_related(
+            "patient__user",
+            "doctor__user",
+            "time",
+        )
+        user = self.request.user
+        roles = active_roles(user)
+        if roles.intersection(
+            {
+                RoleAssignment.Role.ADMINISTRATOR,
+                RoleAssignment.Role.RECEPTIONIST,
+            }
+        ):
+            doctor_id = self.request.query_params.get("doctor")
+            if doctor_id:
+                queryset = queryset.filter(doctor_id=doctor_id)
+            return queryset
+        return queryset.filter(
+            Q(patient__user=user) | Q(doctor__user=user)
+        ).distinct()
+
+    def perform_create(self, serializer):
+        patient = getattr(self.request.user, "patient_profile", None)
+        if not patient:
+            raise ValidationError("A patient profile is required to join a waitlist.")
+        entry = serializer.save(patient=patient)
+        AuditEvent.record(
+            request=self.request,
+            action="waitlist.joined",
+            target=entry,
+        )
+
+    @action(detail=True, methods=["post"])
+    def accept(self, request, pk=None):
+        """Convert an offer into a real appointment, if it is still free.
+
+        The booking runs in its own transaction so that the row lock covers the
+        capacity re-check. Expiring a stale offer happens *after* that block —
+        raising inside it would roll the expiry back and leave the offer open.
+        """
+        with transaction.atomic():
+            entry = get_object_or_404(
+                self.get_queryset().select_for_update(),
+                pk=pk,
+            )
+            if entry.patient.user_id != request.user.id:
+                raise PermissionDenied("This offer belongs to another patient.")
+            if entry.status != WaitlistEntry.Status.OFFERED:
+                raise ValidationError("This waitlist entry has no open offer.")
+
+            reason = slot_unavailable_reason(
+                doctor=entry.doctor,
+                slot=entry.time,
+                scheduled_date=entry.requested_date,
+            )
+            if not reason:
+                facility, department = AppointmentViewSet._doctor_location(
+                    entry.doctor
+                )
+                appointment = Appointment.objects.create(
+                    patient=entry.patient,
+                    doctor=entry.doctor,
+                    appointment_type=Appointment.Type.OFFLINE,
+                    symptoms=entry.symptoms or "Booked from the waitlist.",
+                    scheduled_date=entry.requested_date,
+                    time=entry.time,
+                    facility=facility,
+                    department=department,
+                )
+                entry.status = WaitlistEntry.Status.BOOKED
+                entry.appointment = appointment
+                entry.save(
+                    update_fields=["status", "appointment", "updated_at"]
+                )
+                AuditEvent.record(
+                    request=request,
+                    action="waitlist.accepted",
+                    target=appointment,
+                    facility=facility,
+                )
+                return Response(
+                    {
+                        "success": True,
+                        "appointment": AppointmentSerializer(
+                            appointment,
+                            context={"request": request},
+                        ).data,
+                    },
+                    status=status.HTTP_201_CREATED,
+                )
+
+        entry.status = WaitlistEntry.Status.EXPIRED
+        entry.save(update_fields=["status", "updated_at"])
+        raise ValidationError({"time": reason})
+
+    @action(detail=True, methods=["post"])
+    def leave(self, request, pk=None):
+        entry = self.get_object()
+        if entry.patient.user_id != request.user.id and not has_any_role(
+            request.user,
+            RoleAssignment.Role.RECEPTIONIST,
+            RoleAssignment.Role.ADMINISTRATOR,
+        ):
+            raise PermissionDenied("You cannot change this waitlist entry.")
+        if entry.status == WaitlistEntry.Status.BOOKED:
+            raise ValidationError("This entry has already been booked.")
+        entry.status = WaitlistEntry.Status.CANCELLED
+        entry.save(update_fields=["status", "updated_at"])
+        return Response({"success": True, "entry": self.get_serializer(entry).data})

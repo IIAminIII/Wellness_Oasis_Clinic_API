@@ -89,3 +89,70 @@ class Appointment(models.Model):
                 name="appt_facility_status_idx",
             ),
         ]
+
+
+class WaitlistEntry(models.Model):
+    """A patient waiting for a slot that was full when they asked for it."""
+
+    class Status(models.TextChoices):
+        WAITING = "Waiting", "Waiting"
+        OFFERED = "Offered", "Offered"
+        BOOKED = "Booked", "Booked"
+        CANCELLED = "Cancelled", "Cancelled"
+        EXPIRED = "Expired", "Expired"
+
+    patient = models.ForeignKey(
+        Patient,
+        on_delete=models.CASCADE,
+        related_name="waitlist_entries",
+    )
+    doctor = models.ForeignKey(
+        Doctor,
+        on_delete=models.CASCADE,
+        related_name="waitlist_entries",
+    )
+    time = models.ForeignKey(
+        AvailableTime,
+        on_delete=models.PROTECT,
+        related_name="waitlist_entries",
+    )
+    requested_date = models.DateField()
+    symptoms = models.TextField(max_length=2000, blank=True)
+    status = models.CharField(
+        max_length=10,
+        choices=Status.choices,
+        default=Status.WAITING,
+    )
+    appointment = models.OneToOneField(
+        Appointment,
+        on_delete=models.SET_NULL,
+        related_name="waitlist_entry",
+        blank=True,
+        null=True,
+    )
+    offered_at = models.DateTimeField(blank=True, null=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ["requested_date", "created_at"]
+        verbose_name_plural = "waitlist entries"
+        constraints = [
+            models.UniqueConstraint(
+                fields=["patient", "doctor", "time", "requested_date"],
+                condition=models.Q(status__in=["Waiting", "Offered"]),
+                name="unique_open_waitlist_request",
+            ),
+        ]
+        indexes = [
+            models.Index(
+                fields=["doctor", "requested_date", "time", "status"],
+                name="waitlist_slot_idx",
+            ),
+        ]
+
+    def __str__(self):
+        return (
+            f"{self.patient} waiting for {self.doctor} "
+            f"on {self.requested_date}"
+        )

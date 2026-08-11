@@ -36,6 +36,22 @@ Populate non-patient demonstration services, doctors, and schedules:
 The command is idempotent. It never creates patient accounts, appointments, or
 clinical records.
 
+## Slot capacity
+
+Slots that existed before capacity was introduced hold one patient each. Raise
+them in bulk, previewing first:
+
+```powershell
+.\.venv\Scripts\python.exe manage.py set_slot_capacity 4 --dry-run
+.\.venv\Scripts\python.exe manage.py set_slot_capacity 4
+```
+
+`--weekday 5` limits it to one weekday, `--slot 3` to specific slots (repeatable),
+and `--include-inactive` also covers slots that are switched off. Re-running is a
+no-op. Lowering capacity below the number of patients already booked into a slot
+is allowed; those appointments stand and the slot simply refuses new bookings
+until it drains.
+
 ## Render deployment
 
 Use `./build.sh` as the Render build command and:

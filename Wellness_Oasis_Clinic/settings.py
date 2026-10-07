@@ -35,7 +35,6 @@ ALLOWED_HOSTS = env.list(
     default=[
         "127.0.0.1",
         "localhost",
-        "wellness-oasis-clinic-api.onrender.com",
         ".vercel.app",
     ],
 )

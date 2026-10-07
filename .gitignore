@@ -9,3 +9,4 @@ patients/images/
 staticfiles/
 .coverage
 .pytest_cache/
+.neon

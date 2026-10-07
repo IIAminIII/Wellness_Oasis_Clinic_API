@@ -50,11 +50,16 @@ class DoctorViewSet(viewsets.ModelViewSet):
     ordering = ["user__first_name"]
 
     def get_queryset(self):
-        return (
+        queryset = (
             Doctor.objects.select_related("user")
             .prefetch_related("designation", "specialization", "available_time")
             .distinct()
         )
+        specialization = self.request.query_params.get("specialization", "")
+        slugs = [slug for slug in specialization.split(",") if slug]
+        if slugs:
+            queryset = queryset.filter(specialization__slug__in=slugs)
+        return queryset
 
 
 class DesignationViewSet(viewsets.ModelViewSet):

@@ -42,6 +42,17 @@ SERVICES = [
     ),
 ]
 
+# Which doctor specializations deliver each service. Drives the
+# "doctors for this service" section on the public site.
+SERVICE_SPECIALIZATIONS = {
+    "Diagnosis": ["Neurology", "Ophthalmology"],
+    "Emergency Treatment": ["Emergency Medicine", "General Surgery"],
+    "Physical Therapy": ["Orthopedics"],
+    "Surgery": ["General Surgery", "Orthopedics"],
+    "Bone Care": ["Orthopedics"],
+    "Hair Transplant": ["Dermatology", "General Surgery"],
+}
+
 DOCTORS = [
     {
         "username": "demo_doctor_alberto",
@@ -69,6 +80,33 @@ DOCTORS = [
         "specialization": "Ophthalmology",
         "fee": 800,
         "image": "doctors/images/doc5.jpg",
+    },
+    {
+        "username": "demo_doctor_mariana",
+        "first_name": "Mariana",
+        "last_name": "Holt",
+        "designation": "Consultant",
+        "specialization": "Orthopedics",
+        "fee": 900,
+        "image": "doctors/images/doc4.jpeg",
+    },
+    {
+        "username": "demo_doctor_imran",
+        "first_name": "Imran",
+        "last_name": "Chowdhury",
+        "designation": "Medical Officer",
+        "specialization": "Emergency Medicine",
+        "fee": 700,
+        "image": "doctors/images/doc8.jpg",
+    },
+    {
+        "username": "demo_doctor_sofia",
+        "first_name": "Sofia",
+        "last_name": "Renner",
+        "designation": "Consultant",
+        "specialization": "Dermatology",
+        "fee": 1100,
+        "image": "doctors/images/doc9.jpg",
     },
 ]
 
@@ -114,6 +152,12 @@ class Command(BaseCommand):
                 changed = True
             if changed:
                 service.save()
+            for spec_name in SERVICE_SPECIALIZATIONS.get(name, []):
+                specialization, _ = Specialization.objects.get_or_create(
+                    name=spec_name,
+                    defaults={"slug": slugify(spec_name)},
+                )
+                service.specializations.add(specialization)
 
         time_slots = [
             AvailableTime.objects.get_or_create(

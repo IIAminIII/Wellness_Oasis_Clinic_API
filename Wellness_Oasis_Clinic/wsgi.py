@@ -26,3 +26,17 @@ if not settings.DEBUG:
 
     application = WhiteNoise(application, autorefresh=True)
     application.add_files(str(settings.MEDIA_ROOT), prefix=settings.MEDIA_URL)
+
+    # Vercel builds from Git, where media/ is ignored and the filesystem is
+    # read-only, so build.sh never runs to copy the demo assets there. Serve
+    # them straight from their versioned source folders under the same URLs
+    # the ImageField upload_to paths produce.
+    for source, prefix in (
+        (settings.BASE_DIR / "doctors" / "images", "/media/doctors/images/"),
+        (settings.BASE_DIR / "services" / "image", "/media/services/image/"),
+    ):
+        if source.is_dir():
+            application.add_files(str(source), prefix=prefix)
+
+# Vercel's Python runtime discovers the WSGI callable by the name ``app``.
+app = application

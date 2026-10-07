@@ -27,9 +27,17 @@ SECRET_KEY = env(
 if not DEBUG and SECRET_KEY == "local-development-only-change-me":
     raise RuntimeError("SECRET_KEY must be set when DEBUG=False")
 
+# Set by Vercel in both build and runtime environments.
+ON_VERCEL = bool(env("VERCEL", default=""))
+
 ALLOWED_HOSTS = env.list(
     "ALLOWED_HOSTS",
-    default=["127.0.0.1", "localhost", "wellness-oasis-clinic-api.onrender.com"],
+    default=[
+        "127.0.0.1",
+        "localhost",
+        "wellness-oasis-clinic-api.onrender.com",
+        ".vercel.app",
+    ],
 )
 FRONTEND_URL = env(
     "FRONTEND_URL",
@@ -86,6 +94,7 @@ CSRF_TRUSTED_ORIGINS = env.list(
         "http://127.0.0.1:5500",
         "http://localhost:5500",
         "https://wellness-oasis-clinic-front-end.vercel.app",
+        "https://*.vercel.app",
     ],
 )
 
@@ -176,7 +185,13 @@ STORAGES = {
         "BACKEND": "django.core.files.storage.FileSystemStorage",
     },
     "staticfiles": {
-        "BACKEND": "whitenoise.storage.CompressedManifestStaticFilesStorage",
+        # On Vercel the collectstatic output (and its manifest) lives in a
+        # separate static deployment, not inside the Python function, so the
+        # manifest cannot be read at runtime. Plain hashed-free storage keeps
+        # {% static %} emitting predictable /static/... URLs there.
+        "BACKEND": "whitenoise.storage.CompressedStaticFilesStorage"
+        if ON_VERCEL
+        else "whitenoise.storage.CompressedManifestStaticFilesStorage",
     },
 }
 MEDIA_URL = "/media/"

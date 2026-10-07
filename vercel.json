@@ -1,0 +1,18 @@
+{
+  "version": 2,
+  "builds": [
+    {
+      "src": "package.json",
+      "use": "@vercel/static-build",
+      "config": { "distDir": "staticfiles" }
+    },
+    {
+      "src": "Wellness_Oasis_Clinic/wsgi.py",
+      "use": "@vercel/python"
+    }
+  ],
+  "routes": [
+    { "src": "/static/(.*)", "dest": "/$1" },
+    { "src": "/(.*)", "dest": "Wellness_Oasis_Clinic/wsgi.py" }
+  ]
+}

@@ -109,12 +109,12 @@ TEMPLATES = [
 WSGI_APPLICATION = "Wellness_Oasis_Clinic.wsgi.application"
 ASGI_APPLICATION = "Wellness_Oasis_Clinic.asgi.application"
 
-# Supabase (and any PgBouncer) in transaction-pooling mode hands a different
-# backend connection to each statement, so Django must not hold connections open
-# or use server-side cursors. Its transaction pooler listens on 6543; the session
-# pooler and a direct connection both use 5432 and behave like normal Postgres.
+# PgBouncer in transaction-pooling mode hands a different backend connection to
+# each statement, so Django must not hold connections open or use server-side
+# cursors. Supabase's transaction pooler listens on 6543; Neon's pooler keeps
+# port 5432 but marks the endpoint hostname with "-pooler".
 DATABASE_URL = env("DATABASE_URL", default=f"sqlite:///{BASE_DIR / 'db.sqlite3'}")
-USING_TRANSACTION_POOLER = ":6543" in DATABASE_URL
+USING_TRANSACTION_POOLER = ":6543" in DATABASE_URL or "-pooler" in DATABASE_URL
 
 DATABASES = {
     "default": dj_database_url.parse(
